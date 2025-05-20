@@ -352,7 +352,7 @@ re_open_logfile( void )
 
 
 int
-main( int argc, char** argv )
+thttpd_main( int argc, char** argv )
     {
     char* cp;
     struct passwd* pwd;

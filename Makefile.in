@@ -29,8 +29,9 @@
 # Top level hierarchy.
 prefix = @prefix@
 exec_prefix = @exec_prefix@
+INCDIR = @includedir@
 # Pathname of directory to install the binary.
-BINDIR = @sbindir@
+LIBDIR = @libdir@
 # Pathname of directory to install the man page.
 MANDIR = @mandir@
 # Pathname of directory to install the CGI programs.
@@ -56,6 +57,10 @@ LIBS =		@LIBS@
 NETLIBS =	@V_NETLIBS@
 INSTALL =	@INSTALL@
 
+AR=ar
+ARFLAGS=rc
+RANLIB=ranlib
+
 @SET_MAKE@
 
 .c.o:
@@ -66,7 +71,7 @@ SRC =		thttpd.c libhttpd.c fdwatch.c mmc.c timers.c match.c tdate_parse.c
 
 OBJ =		$(SRC:.c=.o) @LIBOBJS@
 
-ALL =		thttpd
+ALL =		libthttpd.a libthttpd.so
 
 GENHDR =	mime_encodings.h mime_types.h
 
@@ -77,9 +82,12 @@ SUBDIRS =	cgi-src extras
 all:		this subdirs
 this:		$(ALL)
 
-thttpd: $(OBJ)
-	@rm -f $@
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJ) $(LIBS) $(NETLIBS)
+libthttpd.a: $(OBJ)
+	$(AR) $(ARFLAGS) $@ $(OBJ)
+	-@ ($(RANLIB) $@ || true) >/dev/null 2>&1
+
+libthttpd.so: $(OBJ) libthttpd.a
+	$(CC) -shared $(CFLAGS) -o $@ $(OBJ) $(LIBS) $(NETLIBS) $(LDFLAGS)
 
 mime_encodings.h:	mime_encodings.txt
 	rm -f mime_encodings.h
@@ -110,8 +118,13 @@ subdirs:
 install:	installthis install-man installsubdirs
 
 installthis:
-	-mkdir -p $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 555 thttpd $(DESTDIR)$(BINDIR)
+	-mkdir -p $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m 555 libhttpd.h $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m 555 thttpd.h $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m 555 timers.h $(DESTDIR)$(INCDIR)
+	-mkdir -p $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m 555 libthttpd.a $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m 555 libthttpd.so $(DESTDIR)$(LIBDIR)
 
 install-man:
 	-mkdir -p $(DESTDIR)$(MANDIR)/man8

@@ -120,7 +120,6 @@ typedef int socklen_t;
 static void check_options( void );
 static void free_httpd_server( httpd_server* hs );
 static int initialize_listen_socket( httpd_sockaddr* saP );
-static void add_response( httpd_conn* hc, char* str );
 static void send_mime( httpd_conn* hc, int status, char* title, char* encodings, char* extraheads, char* type, off_t length, time_t mod );
 static void send_response( httpd_conn* hc, int status, char* title, char* extraheads, char* form, char* arg );
 static void send_response_tail( httpd_conn* hc );
@@ -136,7 +135,6 @@ static int auth_check2( httpd_conn* hc, char* dirname  );
 #endif /* AUTH_FILE */
 static void send_dirredirect( httpd_conn* hc );
 static int hexit( char c );
-static void strdecode( char* to, char* from );
 #ifdef GENERATE_INDEXES
 static void strencode( char* to, int tosize, char* from );
 #endif /* GENERATE_INDEXES */
@@ -548,7 +546,7 @@ char* httpd_err503form =
 
 
 /* Append a string to the buffer waiting to be sent as response. */
-static void
+void
 add_response( httpd_conn* hc, char* str )
     {
     size_t len;
@@ -1234,7 +1232,7 @@ hexit( char c )
 /* Copies and decodes a string.  It's ok for from and to to be the
 ** same string.
 */
-static void
+void
 strdecode( char* to, char* from )
     {
     for ( ; *from != '\0'; ++to, ++from )
