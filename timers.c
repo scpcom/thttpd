@@ -1,6 +1,6 @@
 /* timers.c - simple timer routines
 **
-** Copyright © 1995,1998,2000 by Jef Poskanzer <jef@mail.acme.com>.
+** Copyright © 1995,1998,2000,2014 by Jef Poskanzer <jef@mail.acme.com>.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -328,7 +328,7 @@ tmr_cleanup( void )
 
 
 void
-tmr_destroy( void )
+tmr_term( void )
     {
     int h;
 
@@ -344,7 +344,7 @@ void
 tmr_logstats( long secs )
     {
     syslog(
-	LOG_INFO, "  timers - %d allocated, %d active, %d free",
+	LOG_NOTICE, "  timers - %d allocated, %d active, %d free",
 	alloc_count, active_count, free_count );
     if ( active_count + free_count != alloc_count )
 	syslog( LOG_ERR, "timer counts don't add up!" );

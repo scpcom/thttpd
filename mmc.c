@@ -1,6 +1,6 @@
 /* mmc.c - mmap cache
 **
-** Copyright © 1998,2001 by Jef Poskanzer <jef@mail.acme.com>.
+** Copyright © 1998,2001,2014 by Jef Poskanzer <jef@mail.acme.com>.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -395,7 +395,7 @@ really_unmap( Map** mm )
 
 
 void
-mmc_destroy( void )
+mmc_term( void )
     {
     Map* m;
 
@@ -523,9 +523,9 @@ void
 mmc_logstats( long secs )
     {
     syslog(
-	LOG_INFO, "  map cache - %d allocated, %d active (%lld bytes), %d free; hash size: %d; expire age: %ld",
+	LOG_NOTICE, "  map cache - %d allocated, %d active (%lld bytes), %d free; hash size: %d; expire age: %lld",
 	alloc_count, map_count, (long long) mapped_bytes, free_count, hash_size,
-	expire_age );
+	(long long) expire_age );
     if ( map_count + free_count != alloc_count )
 	syslog( LOG_ERR, "map counts don't add up!" );
     }

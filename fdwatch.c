@@ -278,7 +278,7 @@ fdwatch_logstats( long secs )
     {
     if ( secs > 0 )
 	syslog(
-	    LOG_INFO, "  fdwatch - %ld %ss (%g/sec)",
+	    LOG_NOTICE, "  fdwatch - %ld %ss (%g/sec)",
 	    nwatches, WHICH, (float) nwatches / secs );
     nwatches = 0;
     }

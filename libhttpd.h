@@ -52,6 +52,9 @@
 #define NEW(t,n) ((t*) malloc( sizeof(t) * (n) ))
 #define RENEW(o,t,n) ((t*) realloc( (void*) o, sizeof(t) * (n) ))
 
+/* Do overlapping strcpy safely, by using memmove. */
+#define ol_strcpy(dst,src) memmove(dst,src,strlen(src)+1)
+
 
 /* The httpd structs. */
 
@@ -149,6 +152,9 @@ typedef struct {
 #define METHOD_GET 1
 #define METHOD_HEAD 2
 #define METHOD_POST 3
+#define METHOD_PUT 4
+#define METHOD_DELETE 5
+#define METHOD_TRACE 6
 
 /* States for checked_state. */
 #define CHST_FIRSTWORD 0

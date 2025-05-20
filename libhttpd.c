@@ -1,7 +1,7 @@
 /* libhttpd.c - HTTP protocol library
 **
-** Copyright © 1995,1998,1999,2000,2001 by Jef Poskanzer <jef@mail.acme.com>.
-** All rights reserved.
+** Copyright © 1995,1998,1999,2000,2001,2015 by
+** Jef Poskanzer <jef@mail.acme.com>. All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
 ** modification, are permitted provided that the following conditions
@@ -292,7 +292,7 @@ httpd_initialize(
 	    }
 	/* Nuke any leading slashes in the cgi pattern. */
 	while ( ( cp = strstr( hs->cgi_pattern, "|/" ) ) != (char*) 0 )
-	    (void) strcpy( cp + 1, cp + 2 );
+	    (void) ol_strcpy( cp + 1, cp + 2 );
 	}
     hs->cgi_limit = cgi_limit;
     hs->cgi_count = 0;
@@ -1210,6 +1210,9 @@ httpd_method_str( int method )
 	case METHOD_GET: return "GET";
 	case METHOD_HEAD: return "HEAD";
 	case METHOD_POST: return "POST";
+	case METHOD_PUT: return "PUT";
+	case METHOD_DELETE: return "DELETE";
+	case METHOD_TRACE: return "TRACE";
 	default: return "UNKNOWN";
 	}
     }
@@ -1508,7 +1511,7 @@ expand_symlinks( char* path, char** restP, int no_symlink_check, int tildemapped
 	/* Remove any leading slashes. */
 	while ( rest[0] == '/' )
 	    {
-	    (void) strcpy( rest, &(rest[1]) );
+	    (void) ol_strcpy( rest, &(rest[1]) );
 	    --restlen;
 	    }
     r = rest;
@@ -1626,7 +1629,7 @@ expand_symlinks( char* path, char** restP, int no_symlink_check, int tildemapped
 	/* Insert the link contents in front of the rest of the filename. */
 	if ( restlen != 0 )
 	    {
-	    (void) strcpy( rest, r );
+	    (void) ol_strcpy( rest, r );
 	    httpd_realloc_str( &rest, &maxrest, restlen + linklen + 1 );
 	    for ( i = restlen; i >= 0; --i )
 		rest[i + linklen + 1] = rest[i];
@@ -2028,6 +2031,12 @@ httpd_parse_request( httpd_conn* hc )
 	hc->method = METHOD_HEAD;
     else if ( strcasecmp( method_str, httpd_method_str( METHOD_POST ) ) == 0 )
 	hc->method = METHOD_POST;
+    else if ( strcasecmp( method_str, httpd_method_str( METHOD_PUT ) ) == 0 )
+	hc->method = METHOD_PUT;
+    else if ( strcasecmp( method_str, httpd_method_str( METHOD_DELETE ) ) == 0 )
+	hc->method = METHOD_DELETE;
+    else if ( strcasecmp( method_str, httpd_method_str( METHOD_TRACE ) ) == 0 )
+	hc->method = METHOD_TRACE;
     else
 	{
 	httpd_send_err( hc, 501, err501title, "", err501form, method_str );
@@ -2355,7 +2364,7 @@ httpd_parse_request( httpd_conn* hc )
 		 hc->expnfilename, hc->hs->cwd, strlen( hc->hs->cwd ) ) == 0 )
 	    {
 	    /* Elide the current directory. */
-	    (void) strcpy(
+	    (void) ol_strcpy(
 		hc->expnfilename, &hc->expnfilename[strlen( hc->hs->cwd )] );
 	    }
 #ifdef TILDE_MAP_2
@@ -2422,26 +2431,26 @@ de_dotdot( char* file )
 	{
 	for ( cp2 = cp + 2; *cp2 == '/'; ++cp2 )
 	    continue;
-	(void) strcpy( cp + 1, cp2 );
+	(void) ol_strcpy( cp + 1, cp2 );
 	}
 
     /* Remove leading ./ and any /./ sequences. */
     while ( strncmp( file, "./", 2 ) == 0 )
-	(void) strcpy( file, file + 2 );
+	(void) ol_strcpy( file, file + 2 );
     while ( ( cp = strstr( file, "/./") ) != (char*) 0 )
-	(void) strcpy( cp, cp + 2 );
+	(void) ol_strcpy( cp, cp + 2 );
 
     /* Alternate between removing leading ../ and removing xxx/../ */
     for (;;)
 	{
 	while ( strncmp( file, "../", 3 ) == 0 )
-	    (void) strcpy( file, file + 3 );
+	    (void) ol_strcpy( file, file + 3 );
 	cp = strstr( file, "/../" );
 	if ( cp == (char*) 0 )
 	    break;
 	for ( cp2 = cp - 1; cp2 >= file && *cp2 != '/'; --cp2 )
 	    continue;
-	(void) strcpy( cp2 + 1, cp + 4 );
+	(void) ol_strcpy( cp2 + 1, cp + 4 );
 	}
 
     /* Also elide any xxx/.. at the end. */
@@ -2658,7 +2667,7 @@ cgi_kill2( ClientData client_data, struct timeval* nowP )
 
     pid = (pid_t) client_data.i;
     if ( kill( pid, SIGKILL ) == 0 )
-	syslog( LOG_ERR, "hard-killed CGI process %d", pid );
+	syslog( LOG_WARNING, "hard-killed CGI process %d", pid );
     }
 
 static void
@@ -2669,7 +2678,7 @@ cgi_kill( ClientData client_data, struct timeval* nowP )
     pid = (pid_t) client_data.i;
     if ( kill( pid, SIGINT ) == 0 )
 	{
-	syslog( LOG_ERR, "killed CGI process %d", pid );
+	syslog( LOG_WARNING, "killed CGI process %d", pid );
 	/* In case this isn't enough, schedule an uncatchable kill. */
 	if ( tmr_create( nowP, cgi_kill2, client_data, 5 * 1000L, 0 ) == (Timer*) 0 )
 	    {
@@ -3567,54 +3576,45 @@ cgi( httpd_conn* hc )
     int r;
     ClientData client_data;
 
-    if ( hc->method == METHOD_GET || hc->method == METHOD_POST )
-	{
-	if ( hc->hs->cgi_limit != 0 && hc->hs->cgi_count >= hc->hs->cgi_limit )
-	    {
-	    httpd_send_err(
-		hc, 503, httpd_err503title, "", httpd_err503form,
-		hc->encodedurl );
-	    return -1;
-	    }
-	++hc->hs->cgi_count;
-	httpd_clear_ndelay( hc->conn_fd );
-	r = fork( );
-	if ( r < 0 )
-	    {
-	    syslog( LOG_ERR, "fork - %m" );
-	    httpd_send_err(
-		hc, 500, err500title, "", err500form, hc->encodedurl );
-	    return -1;
-	    }
-	if ( r == 0 )
-	    {
-	    /* Child process. */
-	    sub_process = 1;
-	    httpd_unlisten( hc->hs );
-	    cgi_child( hc );
-	    }
-
-	/* Parent process. */
-	syslog( LOG_DEBUG, "spawned CGI process %d for file '%.200s'", r, hc->expnfilename );
-#ifdef CGI_TIMELIMIT
-	/* Schedule a kill for the child process, in case it runs too long */
-	client_data.i = r;
-	if ( tmr_create( (struct timeval*) 0, cgi_kill, client_data, CGI_TIMELIMIT * 1000L, 0 ) == (Timer*) 0 )
-	    {
-	    syslog( LOG_CRIT, "tmr_create(cgi_kill child) failed" );
-	    exit( 1 );
-	    }
-#endif /* CGI_TIMELIMIT */
-	hc->status = 200;
-	hc->bytes_sent = CGI_BYTECOUNT;
-	hc->should_linger = 0;
-	}
-    else
+    if ( hc->hs->cgi_limit != 0 && hc->hs->cgi_count >= hc->hs->cgi_limit )
 	{
 	httpd_send_err(
-	    hc, 501, err501title, "", err501form, httpd_method_str( hc->method ) );
+	    hc, 503, httpd_err503title, "", httpd_err503form,
+	    hc->encodedurl );
 	return -1;
 	}
+    ++hc->hs->cgi_count;
+    httpd_clear_ndelay( hc->conn_fd );
+    r = fork( );
+    if ( r < 0 )
+	{
+	syslog( LOG_ERR, "fork - %m" );
+	httpd_send_err(
+	    hc, 500, err500title, "", err500form, hc->encodedurl );
+	return -1;
+	}
+    if ( r == 0 )
+	{
+	/* Child process. */
+	sub_process = 1;
+	httpd_unlisten( hc->hs );
+	cgi_child( hc );
+	}
+
+    /* Parent process. */
+    syslog( LOG_DEBUG, "spawned CGI process %d for file '%.200s'", r, hc->expnfilename );
+#ifdef CGI_TIMELIMIT
+    /* Schedule a kill for the child process, in case it runs too long */
+    client_data.i = r;
+    if ( tmr_create( (struct timeval*) 0, cgi_kill, client_data, CGI_TIMELIMIT * 1000L, 0 ) == (Timer*) 0 )
+	{
+	syslog( LOG_CRIT, "tmr_create(cgi_kill child) failed" );
+	exit( 1 );
+	}
+#endif /* CGI_TIMELIMIT */
+    hc->status = 200;
+    hc->bytes_sent = CGI_BYTECOUNT;
+    hc->should_linger = 0;
 
     return 0;
     }
@@ -3636,14 +3636,6 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
     char* pi;
 
     expnlen = strlen( hc->expnfilename );
-
-    if ( hc->method != METHOD_GET && hc->method != METHOD_HEAD &&
-	 hc->method != METHOD_POST )
-	{
-	httpd_send_err(
-	    hc, 501, err501title, "", err501form, httpd_method_str( hc->method ) );
-	return -1;
-	}
 
     /* Stat the file. */
     if ( stat( hc->expnfilename, &hc->sb ) < 0 )
@@ -3852,6 +3844,13 @@ really_start_request( httpd_conn* hc, struct timeval* nowP )
 	    hc, 403, err403title, "",
 	    ERROR_FORM( err403form, "The requested URL '%.80s' resolves to a file plus CGI-style pathinfo, but the file is not a valid CGI file.\n" ),
 	    hc->encodedurl );
+	return -1;
+	}
+
+    if ( hc->method != METHOD_GET && hc->method != METHOD_HEAD )
+	{
+	httpd_send_err(
+	    hc, 501, err501title, "", err501form, httpd_method_str( hc->method ) );
 	return -1;
 	}
 
@@ -4273,7 +4272,7 @@ void
 httpd_logstats( long secs )
     {
     if ( str_alloc_count > 0 )
-	syslog( LOG_INFO,
+	syslog( LOG_NOTICE,
 	    "  libhttpd - %d strings allocated, %lu bytes (%g bytes/str)",
 	    str_alloc_count, (unsigned long) str_alloc_size,
 	    (float) str_alloc_size / str_alloc_count );

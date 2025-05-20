@@ -1,6 +1,6 @@
 /* mmc.h - header file for mmap cache package
 **
-** Copyright © 1998 by Jef Poskanzer <jef@mail.acme.com>.
+** Copyright © 1998,2014 by Jef Poskanzer <jef@mail.acme.com>.
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -47,7 +47,7 @@ void mmc_unmap( void* addr, struct stat* sbP, struct timeval* nowP );
 void mmc_cleanup( struct timeval* nowP );
 
 /* Free all storage, usually in preparation for exitting. */
-void mmc_destroy( void );
+void mmc_term( void );
 
 /* Generate debugging statistics syslog message. */
 void mmc_logstats( long secs );

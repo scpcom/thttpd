@@ -2,31 +2,46 @@
 #
 # thttpd.sh - startup script for thttpd on FreeBSD
 #
-# This goes in /usr/local/etc/rc.d and gets run at boot-time.
+# This should be manually installed as:
+#   /usr/local/etc/rc.d/thttpd
+# It gets run at boot-time.
+#
+# Variables available:
+#   thttpd_enable='YES'
+#   thttpd_program='/usr/local/sbin/thttpd'
+#   thttpd_pidfile='/var/run/thttpd.pid'
+#   thttpd_devfs=...
+#   thttpd_flags=...
+#
+# PROVIDE: thttpd
+# REQUIRE: LOGIN FILESYSTEMS
+# KEYWORD: shutdown
 
-. /etc/rc.conf
+. /etc/rc.subr
 
-case "${thttpd_enable}" in
-    [Yy][Ee][Ss]) ;;
-    *) exit ;;
-esac
+name='thttpd'
+rcvar='thttpd_enable'
+start_precmd='thttpd_precmd'
+stop_cmd='thttpd_stop'
+thttpd_enable_defval='NO'
 
-case "$1" in
+load_rc_config "$name"
+command="${thttpd_program:-/usr/local/sbin/${name}}"
+pidfile="${thttpd_pidfile:-/var/run/${name}.pid}"
+command_args="-i ${pidfile}"
 
-    start)
-    if [ -x /usr/local/sbin/thttpd_wrapper ] ; then
-	echo -n " thttpd"
-	/usr/local/sbin/thttpd_wrapper &
-    fi
-    ;;
+thttpd_precmd ()
+{
+	if [ -n "$thttpd_devfs" ] ; then
+		mount -t devfs devfs "$thttpd_devfs"
+		devfs -m "$thttpd_devfs" rule -s 1 applyset
+		devfs -m "$thttpd_devfs" rule -s 2 applyset
+	fi
+}
 
-    stop)
-    kill -USR1 `cat /var/run/thttpd.pid`
-    ;;
+thttpd_stop ()
+{
+	kill -USR1 `cat "$pidfile"`
+}
 
-    *)
-    echo "usage: $0 { start | stop }" >&2
-    exit 1
-    ;;
-
-esac
+run_rc_command "$1"
